@@ -5,6 +5,7 @@ import time
 import random
 import shutil
 import numpy as np
+import datetime
 from alive_progress import alive_bar
 
 os.chdir(os.path.dirname(__file__))
@@ -14,14 +15,80 @@ if not os.path.exists('images'):
 
 os.chdir("images")
 
-files = glob.glob("*.png")
-files.extend(glob.glob("*.jpg"))
-filesToIgnore = []
+# Start of functions! --------------------
 
-# Check if images exist
-if (len(files) == 0):
-    print("No iamges found in /images")
-    os._exit(0)
+def splitFiles(output, validRatio = 0.15, testRatio = 0.08):
+    files = glob.glob("*.png")
+    files.extend(glob.glob("*.jpg"))
+
+    if os.path.isdir(output):
+        shutil.rmtree(output)
+
+    os.makedirs(output)
+    os.makedirs(output +'/train/')
+    os.makedirs(output + '/valid/')
+    os.makedirs(output + '/test/')
+
+    files = glob.glob("*.png")
+    files.extend(glob.glob("*.jpg"))
+
+    print("Splitting " + str(len(files)) + " images. Valid:" + str(validRatio) + " Test:" + str(testRatio));
+
+    trainFiles, validFiles, testFiles = np.split(files, [int(len(files) * (1 - (validRatio + testRatio))), int(len(files) * (1 - testRatio))])
+
+    with alive_bar(len(trainFiles)) as compute:
+        for file in trainFiles:
+            (name, ext) = file.split('.')
+            shutil.copy(file, output + '/train/' + file)
+
+            if os.path.isfile(name + '.txt'):
+                shutil.copy(file, output + '/train/' + name + '.txt')
+
+            compute()
+
+    with alive_bar(len(validFiles)) as compute:
+        for file in validFiles:
+            (name, ext) = file.split('.')
+            shutil.copy(file, output + '/valid/' + file)
+
+            if os.path.isfile(name + '.txt'):
+                shutil.copy(file, output + '/valid/' + name + '.txt')
+
+            compute()
+
+    with alive_bar(len(testFiles)) as compute:
+        for file in testFiles:
+            (name, ext) = file.split('.')
+            shutil.copy(file, output + '/test/' + file)
+
+            if os.path.isfile(name + '.txt'):
+                shutil.copy(file, output + '/test/' + name + '.txt')
+
+            compute()
+
+    if os.path.isfile('classes.txt'):
+        shutil.copy('classes.txt', output + '/train/' + '_darknet.labels')
+        shutil.copy('classes.txt', output + '/valid/' + '_darknet.labels')
+        shutil.copy('classes.txt', output + '/test/' + '_darknet.labels')
+
+    print("Zipping dataset, please wait!");
+    shutil.make_archive("output", 'zip', output)
+
+    print("Cleaning up...")
+    shutil.rmtree(output)
+
+    files = glob.glob("*.png")
+    files.extend(glob.glob("*.jpg"))
+    files.extend(glob.glob('*.txt'))
+
+    with alive_bar(len(files)) as compute:
+        for file in files:
+            os.remove(file)
+
+        compute()
+
+    print("Training dataset zipped! See: ./images/output.zip");
+
 
 def flip(img, axis = 0):
     return cv2.flip(img, axis)
@@ -93,18 +160,71 @@ def unconvert(class_id, width, height, x, y, w, h):
     class_id = int(class_id)
     return (class_id, xmin, xmax, ymin, ymax)
 
+# End of functions! ----------------------
+
 files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
-randomfiles = random.choices(files, k=round(len(files)*.15));
+filesToIgnore = []
+
+# Check if images exist
+if (len(files) == 0):
+    print("No iamges found in /images")
+    os._exit(0)
+
+files = glob.glob("*.png")
+files.extend(glob.glob("*.jpg"))
+index = 1
+
+# Rename filenames and delete old files
+with alive_bar(len(files)) as compute:
+    for file in files:
+        (name, ext) = file.split('.')
+
+        shutil.copy(file, "x_" + str(index) + '.' + ext)
+        os.remove(file)
+        
+        if os.path.isfile(name + '.txt'):
+            shutil.copy(name + '.txt', "x_" + str(index) + '.txt')
+            os.remove(name + '.txt')
+
+        index += 1
+        compute()
+
+files = glob.glob("*.png")
+files.extend(glob.glob("*.jpg"))
+
+# Rename files and remove any missing labels
+with alive_bar(len(files)) as compute:
+    for file in files:
+        (name, ext) = file.split('.')
+
+        if ("x_" in name):
+            newName = name.replace('x_', '');
+            
+            if os.path.isfile(name + '.txt'):
+                os.rename(name + '.txt', newName + '.txt')
+                os.rename(file, newName + '.' + ext)
+            else:
+                os.remove(file)
+        else:
+            os.remove()
+
+        compute()
+        
+files = glob.glob("*.png")
+files.extend(glob.glob("*.jpg"))
+randomfiles = random.choices(files, k=round(len(files)*.05)); # only 5% of images
 
 print("Mixing up...")
-with alive_bar( int((len(randomfiles))) ) as compute:
+with alive_bar(int((len(randomfiles)))) as compute:
     for file1 in randomfiles:
         (name1, ext1) = file1.split('.')
 
+        xFiles = glob.glob("*.png")
+        xFiles.extend(glob.glob("*.jpg"))
+        count = len(xFiles)
+
         for file2 in randomfiles:
-            xFiles = glob.glob("*.png")
-            xFiles.extend(glob.glob("*.jpg"))
             (name2, ext2) = file2.split('.')
 
             if file1 == file2:
@@ -112,30 +232,34 @@ with alive_bar( int((len(randomfiles))) ) as compute:
 
             img1 = cv2.imread(file1)
             img2 = cv2.imread(file2)
-            
-            mixup = cv2.addWeighted(img1, 0.5, img2, 0.5, 0)
-            count = len(xFiles) + 1
-            filesToIgnore.append(count)
-            cv2.imwrite(str(count) + '.' + ext1, mixup)
 
-            fileLines = []
+            try:
+                mixup = cv2.addWeighted(img1, 0.5, img2, 0.5, 0)
+                count += 1
+                filesToIgnore.append(count)
+                cv2.imwrite(str(count) + '.' + ext1, mixup)
 
-            with open(name1 + '.txt') as file:
-                for line in file:
-                    fileLines.append(line)
-            
-            with open(name2 + '.txt') as file:
-                for line in file:
-                    fileLines.append(line)
+                fileLines = []
 
-            with open(str(count) + '.txt', 'w') as f:
-                for line in fileLines:
-                    f.write(line)
+                with open(name1 + '.txt') as file:
+                    for line in file:
+                        fileLines.append(line)
+                
+                with open(name2 + '.txt') as file:
+                    for line in file:
+                        fileLines.append(line)
+
+                with open(str(count) + '.txt', 'w') as f:
+                    for line in fileLines:
+                        f.write(line)
+            except:
+                print("Failed to mixup: " + file)
 
         compute()
 
 files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
+count = len(files)
 
 print("Augmenting...")
 with alive_bar(len(files)) as compute:
@@ -153,7 +277,7 @@ with alive_bar(len(files)) as compute:
 
         # Flipped
         flipped = flip(img, 1)
-        count = len(xFiles) + 1
+        count += 1
         cv2.imwrite(str(count) + '.' + ext, flipped)
 
         if os.path.isfile(name + '.txt'):
@@ -179,7 +303,7 @@ with alive_bar(len(files)) as compute:
 
         # Brightness UP
         brigher = increase_brightness(img, 30)
-        count = len(xFiles) + 2
+        count += 1
         cv2.imwrite(str(count) + '.' + ext, brigher)
         
         if os.path.isfile(name + '.txt'):
@@ -187,13 +311,17 @@ with alive_bar(len(files)) as compute:
 
         # Darkness UP
         darker = adjust_gamma(img, 0.5)
-        count = len(xFiles) + 3
+        count += 1
         cv2.imwrite(str(count) + '.' + ext, darker)
 
         if os.path.isfile(name + '.txt'):
             shutil.copy(name + '.txt', str(count) + '.txt')
 
         compute()
+
+files = glob.glob("*.png")
+files.extend(glob.glob("*.jpg"))
+count = len(files)
 
 print("Generating noise")
 with alive_bar(len(files)) as compute:
@@ -209,7 +337,7 @@ with alive_bar(len(files)) as compute:
         img = cv2.imread(file)
 
         prosessed = sp_noise(img, 0.05)
-        count = len(xFiles) + 1
+        count += 1
         filesToIgnore.append(count)
         cv2.imwrite(str(count) + '.' + ext, prosessed)
 
@@ -220,6 +348,7 @@ with alive_bar(len(files)) as compute:
 
 files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
+count = len(files)
 
 print("Generating cutouts")
 with alive_bar(len(files)) as compute:
@@ -235,7 +364,8 @@ with alive_bar(len(files)) as compute:
         img = cv2.imread(file)
 
         prosessed = cutout(img, random.randint(6, 18), 50)
-        count = len(xFiles) + 1
+        count += 1
+        filesToIgnore.append(count)
         cv2.imwrite(str(count) + '.' + ext, prosessed)
 
         if os.path.isfile(name + '.txt'):
@@ -244,3 +374,4 @@ with alive_bar(len(files)) as compute:
         compute()
 
 
+splitFiles("../output")

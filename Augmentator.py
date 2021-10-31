@@ -17,7 +17,7 @@ os.chdir("images")
 
 # Start of functions! --------------------
 
-def splitFiles(output, validRatio = 0.15, testRatio = 0.08):
+def splitFiles(output, originalFiles, validRatio = 0.20, testRatio = 0.10):
     files = glob.glob("*.png")
     files.extend(glob.glob("*.jpg"))
 
@@ -34,10 +34,10 @@ def splitFiles(output, validRatio = 0.15, testRatio = 0.08):
 
     print("Splitting " + str(len(files)) + " images. Valid:" + str(validRatio) + " Test:" + str(testRatio));
 
-    trainFiles, validFiles, testFiles = np.split(files, [int(len(files) * (1 - (validRatio + testRatio))), int(len(files) * (1 - testRatio))])
+    _, validFiles, testFiles = np.split(originalFiles, [int(len(originalFiles) * (1 - (validRatio + testRatio))), int(len(originalFiles) * (1 - testRatio))])
 
-    with alive_bar(len(trainFiles)) as compute:
-        for file in trainFiles:
+    with alive_bar(len(files)) as compute:
+        for file in files:
             (name, ext) = file.split('.')
             shutil.copy(file, output + '/train/' + file)
 
@@ -233,15 +233,17 @@ with alive_bar(len(files)) as compute:
 files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
 
+
 print("Resizing images...")
 with alive_bar(int((len(files)))) as compute:
     for file in files:
         
         try:
             img = cv2.imread(file)
-            resized = image_resize(img, 416, 416)
 
-            cv2.imwrite(file, resized)
+            if (img.shape[0] != 416 or img.shape[1] != 416):
+                resized = image_resize(img, 416, 416)
+                cv2.imwrite(file, resized)
         except:
             print("Failed to resize an image!")
             os._exit(0)
@@ -250,7 +252,8 @@ with alive_bar(int((len(files)))) as compute:
 
 files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
-randomfiles = random.choices(files, k=round(len(files)*.05)); # only 5% of images
+orgFiles = files
+randomfiles = random.choices(files, k=round(len(files)*.02)); # only 2% of images
 
 print("Mixing up...")
 with alive_bar(int((len(randomfiles)))) as compute:
@@ -267,11 +270,12 @@ with alive_bar(int((len(randomfiles)))) as compute:
             if file1 == file2:
                 continue
 
-            img1 = cv2.imread(file1)
-            img2 = cv2.imread(file2)
-
             try:
+                img1 = cv2.imread(file1)
+                img2 = cv2.imread(file2)
+
                 mixup = cv2.addWeighted(img1, 0.5, img2, 0.5, 0)
+
                 count += 1
                 filesToIgnore.append(count)
                 cv2.imwrite(str(count) + '.' + ext1, mixup)
@@ -301,14 +305,14 @@ count = len(files)
 print("Augmenting...")
 with alive_bar(len(files)) as compute:
     for file in files:
-        xFiles = glob.glob("*.png")
-        xFiles.extend(glob.glob("*.jpg"))
         (name, ext) = file.split('.')
 
         if int(name) in filesToIgnore:
             compute()
             continue
 
+        xFiles = glob.glob("*.png")
+        xFiles.extend(glob.glob("*.jpg"))
         newLines = []
         img = cv2.imread(file)
 
@@ -358,20 +362,20 @@ with alive_bar(len(files)) as compute:
 
 files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
-randomfiles = random.choices(files, k=round(len(files)*.20)); # only 20% of images
+randomfiles = random.choices(files, k=round(len(files)*.05)); # only 5% of images
 count = len(files)
 
 print("Generating noise")
 with alive_bar(len(randomfiles)) as compute:
     for file in randomfiles:
-        xFiles = glob.glob("*.png")
-        xFiles.extend(glob.glob("*.jpg"))
         (name, ext) = file.split('.')
 
         if int(name) in filesToIgnore:
             compute()
             continue
 
+        xFiles = glob.glob("*.png")
+        xFiles.extend(glob.glob("*.jpg"))
         img = cv2.imread(file)
         
         try:
@@ -389,20 +393,21 @@ with alive_bar(len(randomfiles)) as compute:
 
 files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
-randomfiles = random.choices(files, k=round(len(files)*.20)); # only 20% of images
+randomfiles = random.choices(files, k=round(len(files)*.05)); # only 5% of images
 count = len(files)
 
 print("Generating cutouts")
 with alive_bar(len(randomfiles)) as compute:
     for file in randomfiles:
-        xFiles = glob.glob("*.png")
-        xFiles.extend(glob.glob("*.jpg"))
         (name, ext) = file.split('.')
 
         if int(name) in filesToIgnore:
             compute()
             continue
         
+        xFiles = glob.glob("*.png")
+        xFiles.extend(glob.glob("*.jpg"))
+
         try:
             img = cv2.imread(file)
 
@@ -419,4 +424,4 @@ with alive_bar(len(randomfiles)) as compute:
         compute()
 
 
-splitFiles("../output")
+splitFiles("../output", orgFiles)

@@ -336,14 +336,17 @@ with alive_bar(len(randomfiles)) as compute:
             continue
 
         img = cv2.imread(file)
+        
+        try:
+            prosessed = sp_noise(img, 0.05)
+            count += 1
+            filesToIgnore.append(count)
+            cv2.imwrite(str(count) + '.' + ext, prosessed)
 
-        prosessed = sp_noise(img, 0.05)
-        count += 1
-        filesToIgnore.append(count)
-        cv2.imwrite(str(count) + '.' + ext, prosessed)
-
-        if os.path.isfile(name + '.txt'):
-            shutil.copy(name + '.txt', str(count) + '.txt')
+            if os.path.isfile(name + '.txt'):
+                shutil.copy(name + '.txt', str(count) + '.txt')
+        except:
+            print("Failed to add noise to " + file)
 
         compute()
 
@@ -363,15 +366,18 @@ with alive_bar(len(randomfiles)) as compute:
             compute()
             continue
         
-        img = cv2.imread(file)
+        try:
+            img = cv2.imread(file)
 
-        prosessed = cutout(img, random.randint(6, 18), 50)
-        count += 1
-        filesToIgnore.append(count)
-        cv2.imwrite(str(count) + '.' + ext, prosessed)
+            prosessed = cutout(img, random.randint(6, 18), 50)
+            count += 1
+            filesToIgnore.append(count)
+            cv2.imwrite(str(count) + '.' + ext, prosessed)
 
-        if os.path.isfile(name + '.txt'):
-            shutil.copy(name + '.txt', str(count) + '.txt')
+            if os.path.isfile(name + '.txt'):
+                shutil.copy(name + '.txt', str(count) + '.txt')
+        except:
+            print("Failed to add cutouts to " + file)
 
         compute()
 

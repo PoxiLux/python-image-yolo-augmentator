@@ -160,6 +160,24 @@ def unconvert(class_id, width, height, x, y, w, h):
     class_id = int(class_id)
     return (class_id, xmin, xmax, ymin, ymax)
 
+def image_resize(image, width = None, height = None, inter = cv2.INTER_AREA):
+    dim = None
+    (h, w) = image.shape[:2]
+
+    if width is None and height is None:
+        return image
+
+    if width is None:
+        r = height / float(h)
+        dim = (int(w * r), height)
+
+    else:
+        r = width / float(w)
+        dim = (width, int(h * r))
+
+    resized = cv2.resize(image, dim, interpolation = inter)
+    return resized
+
 # End of functions! ----------------------
 
 files = glob.glob("*.png")
@@ -211,6 +229,24 @@ with alive_bar(len(files)) as compute:
 
         compute()
         
+files = glob.glob("*.png")
+files.extend(glob.glob("*.jpg"))
+
+print("Resizing images...")
+with alive_bar(int((len(files)))) as compute:
+    for file in files:
+        
+        try:
+            img = cv2.imread(file)
+            resized = image_resize(img, 416, 416)
+
+            cv2.imwrite(file, img)
+        except:
+            print("Failed to resize an image!")
+            os._exit(0)
+
+        compute()
+
 files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
 randomfiles = random.choices(files, k=round(len(files)*.05)); # only 5% of images
@@ -321,7 +357,7 @@ with alive_bar(len(files)) as compute:
 
 files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
-randomfiles = random.choices(files, k=round(len(files)*.25)); # only 25% of images
+randomfiles = random.choices(files, k=round(len(files)*.20)); # only 20% of images
 count = len(files)
 
 print("Generating noise")
@@ -352,7 +388,7 @@ with alive_bar(len(randomfiles)) as compute:
 
 files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
-randomfiles = random.choices(files, k=round(len(files)*.25)); # only 25% of images
+randomfiles = random.choices(files, k=round(len(files)*.20)); # only 20% of images
 count = len(files)
 
 print("Generating cutouts")

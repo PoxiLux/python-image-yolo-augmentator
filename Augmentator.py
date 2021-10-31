@@ -321,11 +321,12 @@ with alive_bar(len(files)) as compute:
 
 files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
+randomfiles = random.choices(files, k=round(len(files)*.25)); # only 25% of images
 count = len(files)
 
 print("Generating noise")
-with alive_bar(len(files)) as compute:
-    for file in files:
+with alive_bar(len(randomfiles)) as compute:
+    for file in randomfiles:
         xFiles = glob.glob("*.png")
         xFiles.extend(glob.glob("*.jpg"))
         (name, ext) = file.split('.')
@@ -348,11 +349,12 @@ with alive_bar(len(files)) as compute:
 
 files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
+randomfiles = random.choices(files, k=round(len(files)*.25)); # only 25% of images
 count = len(files)
 
 print("Generating cutouts")
-with alive_bar(len(files)) as compute:
-    for file in files:
+with alive_bar(len(randomfiles)) as compute:
+    for file in randomfiles:
         xFiles = glob.glob("*.png")
         xFiles.extend(glob.glob("*.jpg"))
         (name, ext) = file.split('.')

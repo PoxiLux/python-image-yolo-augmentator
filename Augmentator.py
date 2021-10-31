@@ -194,6 +194,7 @@ files.extend(glob.glob("*.jpg"))
 index = 1
 
 # Rename filenames and delete old files
+print("Fixing file sequence...")
 with alive_bar(len(files)) as compute:
     for file in files:
         (name, ext) = file.split('.')
@@ -240,7 +241,7 @@ with alive_bar(int((len(files)))) as compute:
             img = cv2.imread(file)
             resized = image_resize(img, 416, 416)
 
-            cv2.imwrite(file, img)
+            cv2.imwrite(file, resized)
         except:
             print("Failed to resize an image!")
             os._exit(0)

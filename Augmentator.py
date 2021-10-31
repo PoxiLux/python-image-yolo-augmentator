@@ -17,7 +17,7 @@ os.chdir("images")
 
 # Start of functions! --------------------
 
-def splitFiles(output, originalFiles, validRatio = 0.20, testRatio = 0.10):
+def splitFiles(output, originalFiles, validRatio = 0.15, testRatio = 0.08):
     files = glob.glob("*.png")
     files.extend(glob.glob("*.jpg"))
 
@@ -32,19 +32,10 @@ def splitFiles(output, originalFiles, validRatio = 0.20, testRatio = 0.10):
     files = glob.glob("*.png")
     files.extend(glob.glob("*.jpg"))
 
-    print("Splitting " + str(len(files)) + " images. Valid:" + str(validRatio) + " Test:" + str(testRatio));
+    print("Splitting " + str(len(originalFiles)) + " images. Valid:" + str(validRatio) + " Test:" + str(testRatio));
 
+    random.shuffle(originalFiles)
     _, validFiles, testFiles = np.split(originalFiles, [int(len(originalFiles) * (1 - (validRatio + testRatio))), int(len(originalFiles) * (1 - testRatio))])
-
-    with alive_bar(len(files)) as compute:
-        for file in files:
-            (name, ext) = file.split('.')
-            shutil.copy(file, output + '/train/' + file)
-
-            if os.path.isfile(name + '.txt'):
-                shutil.copy(file, output + '/train/' + name + '.txt')
-
-            compute()
 
     with alive_bar(len(validFiles)) as compute:
         for file in validFiles:
@@ -52,7 +43,7 @@ def splitFiles(output, originalFiles, validRatio = 0.20, testRatio = 0.10):
             shutil.copy(file, output + '/valid/' + file)
 
             if os.path.isfile(name + '.txt'):
-                shutil.copy(file, output + '/valid/' + name + '.txt')
+                shutil.copy(name + '.txt', output + '/valid/' + name + '.txt')
 
             compute()
 
@@ -62,7 +53,17 @@ def splitFiles(output, originalFiles, validRatio = 0.20, testRatio = 0.10):
             shutil.copy(file, output + '/test/' + file)
 
             if os.path.isfile(name + '.txt'):
-                shutil.copy(file, output + '/test/' + name + '.txt')
+                shutil.copy(name + '.txt', output + '/test/' + name + '.txt')
+
+            compute()
+
+    with alive_bar(len(files)) as compute:
+        for file in files:
+            (name, ext) = file.split('.')
+            shutil.copy(file, output + '/train/' + file)
+
+            if os.path.isfile(name + '.txt'):
+                shutil.copy(name + '.txt', output + '/train/' + name + '.txt')
 
             compute()
 
@@ -85,7 +86,7 @@ def splitFiles(output, originalFiles, validRatio = 0.20, testRatio = 0.10):
         for file in files:
             os.remove(file)
 
-        compute()
+            compute()
 
     print("Training dataset zipped! See: ./images/output.zip");
 
@@ -232,7 +233,7 @@ with alive_bar(len(files)) as compute:
         
 files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
-
+orgFiles = files.copy()
 
 print("Resizing images...")
 with alive_bar(int((len(files)))) as compute:
@@ -252,8 +253,8 @@ with alive_bar(int((len(files)))) as compute:
 
 files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
-orgFiles = files
 randomfiles = random.choices(files, k=round(len(files)*.02)); # only 2% of images
+count = len(files)
 
 print("Mixing up...")
 with alive_bar(int((len(randomfiles)))) as compute:
@@ -262,7 +263,6 @@ with alive_bar(int((len(randomfiles)))) as compute:
 
         xFiles = glob.glob("*.png")
         xFiles.extend(glob.glob("*.jpg"))
-        count = len(xFiles)
 
         for file2 in randomfiles:
             (name2, ext2) = file2.split('.')

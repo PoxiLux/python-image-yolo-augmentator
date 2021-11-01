@@ -17,9 +17,8 @@ os.chdir("images")
 
 # Start of functions! --------------------
 
-def splitFiles(output, originalFiles, validRatio = 0.15, testRatio = 0.08):
-    files = glob.glob("*.png")
-    files.extend(glob.glob("*.jpg"))
+def splitFiles(output, originalFiles, validRatio = 0.10, testRatio = 0.08):
+    files = glob.glob("*.jpg")
 
     if os.path.isdir(output):
         shutil.rmtree(output)
@@ -29,17 +28,16 @@ def splitFiles(output, originalFiles, validRatio = 0.15, testRatio = 0.08):
     os.makedirs(output + '/valid/')
     os.makedirs(output + '/test/')
 
-    files = glob.glob("*.png")
-    files.extend(glob.glob("*.jpg"))
-
-    print("Splitting " + str(len(originalFiles)) + " images. Valid:" + str(validRatio) + " Test:" + str(testRatio));
+    files = glob.glob("*.jpg")
 
     random.shuffle(originalFiles)
-    _, validFiles, testFiles = np.split(originalFiles, [int(len(originalFiles) * (1 - (validRatio + testRatio))), int(len(originalFiles) * (1 - testRatio))])
+    trainFiles, validFiles, testFiles = np.split(originalFiles, [int(len(originalFiles) * (1 - (validRatio + testRatio))), int(len(originalFiles) * (1 - testRatio))])
+
+    print("Splitting " + str(len(files)) + " images. Valid:" + str(validRatio) + " Test:" + str(testRatio));
 
     with alive_bar(len(validFiles)) as compute:
         for file in validFiles:
-            (name, ext) = file.split('.')
+            (name, ext) = getNameAndExt(file)
             shutil.copy(file, output + '/valid/' + file)
 
             if os.path.isfile(name + '.txt'):
@@ -49,7 +47,7 @@ def splitFiles(output, originalFiles, validRatio = 0.15, testRatio = 0.08):
 
     with alive_bar(len(testFiles)) as compute:
         for file in testFiles:
-            (name, ext) = file.split('.')
+            (name, ext) = getNameAndExt(file)
             shutil.copy(file, output + '/test/' + file)
 
             if os.path.isfile(name + '.txt'):
@@ -59,7 +57,7 @@ def splitFiles(output, originalFiles, validRatio = 0.15, testRatio = 0.08):
 
     with alive_bar(len(files)) as compute:
         for file in files:
-            (name, ext) = file.split('.')
+            (name, ext) = getNameAndExt(file)
             shutil.copy(file, output + '/train/' + file)
 
             if os.path.isfile(name + '.txt'):
@@ -78,8 +76,7 @@ def splitFiles(output, originalFiles, validRatio = 0.15, testRatio = 0.08):
     print("Cleaning up...")
     shutil.rmtree(output)
 
-    files = glob.glob("*.png")
-    files.extend(glob.glob("*.jpg"))
+    files = glob.glob("*.jpg")
     files.extend(glob.glob('*.txt'))
 
     with alive_bar(len(files)) as compute:
@@ -179,6 +176,10 @@ def image_resize(image, width = None, height = None, inter = cv2.INTER_AREA):
     resized = cv2.resize(image, dim, interpolation = inter)
     return resized
 
+def getNameAndExt(filePath):
+    (name, ext)  = os.path.splitext(filePath)
+    return (name, ext.replace('.', ''))
+
 # End of functions! ----------------------
 
 files = glob.glob("*.png")
@@ -190,15 +191,13 @@ if (len(files) == 0):
     print("No iamges found in /images")
     os._exit(0)
 
-files = glob.glob("*.png")
-files.extend(glob.glob("*.jpg"))
 index = 1
 
 # Rename filenames and delete old files
 print("Fixing file sequence...")
 with alive_bar(len(files)) as compute:
     for file in files:
-        (name, ext) = file.split('.')
+        (name, ext) = getNameAndExt(file)
 
         shutil.copy(file, "x_" + str(index) + '.' + ext)
         os.remove(file)
@@ -216,7 +215,7 @@ files.extend(glob.glob("*.jpg"))
 # Rename files and remove any missing labels
 with alive_bar(len(files)) as compute:
     for file in files:
-        (name, ext) = file.split('.')
+        (name, ext) = getNameAndExt(file)
 
         if ("x_" in name):
             newName = name.replace('x_', '');
@@ -235,24 +234,56 @@ files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
 orgFiles = files.copy()
 
-print("Resizing images...")
+print("Resizing and converting images...")
 with alive_bar(int((len(files)))) as compute:
     for file in files:
-        
         try:
             img = cv2.imread(file)
+            (name, ext) = getNameAndExt(file)
 
-            if (img.shape[0] != 416 or img.shape[1] != 416):
-                resized = image_resize(img, 416, 416)
-                cv2.imwrite(file, resized)
+            if (img.shape[0] != 416 or img.shape[1] != 416 or ext != "jpg"):
+                resized = image_resize(img, 416, 416)       
+                cv2.imwrite(name + ".jpg", resized, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+                if (ext != "jpg"):
+                    os.remove(file)
         except:
             print("Failed to resize an image!")
             os._exit(0)
 
         compute()
 
-files = glob.glob("*.png")
-files.extend(glob.glob("*.jpg"))
+classifierId = 0
+classifier = "target"
+
+print("Setting classifers: " + str(len(files)))
+files = glob.glob("*.txt")
+
+with alive_bar(int((len(files)))) as compute:
+    for file in files:
+        newLines = []
+
+        with open(file) as f:
+            for line in f:
+                try:
+                    if line != '':
+                        (_, x, y, w, h) = line.strip().split(' ')
+                        newLines.append(str(classifierId) + " " + str(x) + " " + str(y) + " " + str(w) + " " + str(h) + "\n")
+                except:
+                    newLines.append(line)
+                    continue;
+
+        with open(file, 'w') as f:
+            for line in newLines:
+                f.write(line)
+
+        compute()
+
+with open("classes.txt", 'w') as f:
+    f.write(classifier)
+
+print("Valid images to process: " + str(len(files)))
+
+files = glob.glob("*.jpg")
 randomfiles = random.choices(files, k=round(len(files)*.02)); # only 2% of images
 count = len(files)
 
@@ -260,9 +291,6 @@ print("Mixing up...")
 with alive_bar(int((len(randomfiles)))) as compute:
     for file1 in randomfiles:
         (name1, ext1) = file1.split('.')
-
-        xFiles = glob.glob("*.png")
-        xFiles.extend(glob.glob("*.jpg"))
 
         for file2 in randomfiles:
             (name2, ext2) = file2.split('.')
@@ -298,21 +326,19 @@ with alive_bar(int((len(randomfiles)))) as compute:
 
         compute()
 
-files = glob.glob("*.png")
-files.extend(glob.glob("*.jpg"))
+files = glob.glob("*.jpg")
+randomfiles = random.choices(files, k=round(len(files)*.10)); # only 10% of images
 count = len(files)
 
 print("Augmenting...")
-with alive_bar(len(files)) as compute:
-    for file in files:
-        (name, ext) = file.split('.')
+with alive_bar(len(randomfiles)) as compute:
+    for file in randomfiles:
+        (name, ext) = getNameAndExt(file)
 
         if int(name) in filesToIgnore:
             compute()
             continue
 
-        xFiles = glob.glob("*.png")
-        xFiles.extend(glob.glob("*.jpg"))
         newLines = []
         img = cv2.imread(file)
 
@@ -326,17 +352,20 @@ with alive_bar(len(files)) as compute:
 
             with open(name + '.txt') as file:
                 for line in file:
-                    (id, x, y, w, h) = line.strip().split(' ')
+                    try:
+                        (id, x, y, w, h) = line.strip().split(' ')
+                        (uid, ux, uw, uy, uh) = unconvert(id, img.shape[0], img.shape[1], float(x), float(y), float(w), float(h))
 
-                    (uid, ux, uw, uy, uh) = unconvert(id, img.shape[0], img.shape[1], float(x), float(y), float(w), float(h))
+                        oldUX = ux
+                        ux = img.shape[0] - uw
+                        uw = img.shape[0] - oldUX
 
-                    oldUX = ux
-                    ux = img.shape[0] - uw
-                    uw = img.shape[0] - oldUX
+                        (cx, cy, cw, ch) = convert((img.shape[0], img.shape[1]), (ux, uw, uy, uh))
 
-                    (cx, cy, cw, ch) = convert((img.shape[0], img.shape[1]), (ux, uw, uy, uh))
-
-                    newLines.append(id + " " + str(cx) + " " + str(cy) + " " + str(cw) + " " + str(ch) + "\n")
+                        newLines.append(id + " " + str(cx) + " " + str(cy) + " " + str(cw) + " " + str(ch) + "\n")
+                    except:
+                        newLines.append(line) 
+                        continue;
             
             with open(str(count) + '.txt', 'w') as f:
                 for line in newLines:
@@ -360,22 +389,19 @@ with alive_bar(len(files)) as compute:
 
         compute()
 
-files = glob.glob("*.png")
-files.extend(glob.glob("*.jpg"))
-randomfiles = random.choices(files, k=round(len(files)*.05)); # only 5% of images
+files = glob.glob("*.jpg")
+randomfiles = random.choices(files, k=round(len(files)*.02)); # only 2% of images
 count = len(files)
 
 print("Generating noise")
 with alive_bar(len(randomfiles)) as compute:
     for file in randomfiles:
-        (name, ext) = file.split('.')
+        (name, ext) = getNameAndExt(file)
 
         if int(name) in filesToIgnore:
             compute()
             continue
 
-        xFiles = glob.glob("*.png")
-        xFiles.extend(glob.glob("*.jpg"))
         img = cv2.imread(file)
         
         try:
@@ -391,23 +417,19 @@ with alive_bar(len(randomfiles)) as compute:
 
         compute()
 
-files = glob.glob("*.png")
-files.extend(glob.glob("*.jpg"))
-randomfiles = random.choices(files, k=round(len(files)*.05)); # only 5% of images
+files = glob.glob("*.jpg")
+randomfiles = random.choices(files, k=round(len(files)*.02)); # only 2% of images
 count = len(files)
 
 print("Generating cutouts")
 with alive_bar(len(randomfiles)) as compute:
     for file in randomfiles:
-        (name, ext) = file.split('.')
+        (name, ext) = getNameAndExt(file)
 
         if int(name) in filesToIgnore:
             compute()
             continue
         
-        xFiles = glob.glob("*.png")
-        xFiles.extend(glob.glob("*.jpg"))
-
         try:
             img = cv2.imread(file)
 
@@ -422,6 +444,5 @@ with alive_bar(len(randomfiles)) as compute:
             print("Failed to add cutouts to " + file)
 
         compute()
-
 
 splitFiles("../output", orgFiles)

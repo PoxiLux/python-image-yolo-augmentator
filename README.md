@@ -12,6 +12,6 @@ Applies various augmentations to YOLO labelled (or unlabbeld) images:
 
 ## Usage
 1. Place images inside a directory called `/images`.
-2. Then run using your python terminal `python Augmentator.py`, and watch the magic happen. 😊
+2. Then run using your python terminal `python.exe Augmentator.py`, and watch the magic happen. 😊
 
 ![alt text](https://i.imgur.com/tSM5QcB.png)

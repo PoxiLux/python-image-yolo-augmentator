@@ -21,6 +21,8 @@ noise = True
 cutout = True
 
 generateSplitOutput = True
+validPercent = 0.08
+testPercent = 0.05
 
 # --- END OF ADJUSTABLE VARIABLES
 
@@ -33,7 +35,7 @@ os.chdir("images")
 
 # Start of functions! --------------------
 
-def splitFiles(output, originalFiles, validRatio = 0.10, testRatio = 0.08):
+def splitFiles(output, originalFiles, validRatio, testRatio):
     files = glob.glob("*.jpg")
 
     if os.path.isdir(output):
@@ -443,4 +445,4 @@ if cutout:
             compute()
 
 if generateSplitOutput:
-    splitFiles("../output", files)
+    splitFiles("../output", files, validPercent, testPercent)

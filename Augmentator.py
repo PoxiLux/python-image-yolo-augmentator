@@ -8,6 +8,22 @@ import numpy as np
 import datetime
 from alive_progress import alive_bar
 
+# --- START OF ADJUSTABLE VARIABLES
+
+mixupPercent = .002 
+augmentPercent = .20
+noisePercent = .05
+cutoutPercent = .05
+
+mixups = True
+augment = True
+noise = True
+cutout = True
+
+generateSplitOutput = True
+
+# --- END OF ADJUSTABLE VARIABLES
+
 os.chdir(os.path.dirname(__file__))
 
 if not os.path.exists('images'):
@@ -184,7 +200,6 @@ def getNameAndExt(filePath):
 
 files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
-filesToIgnore = []
 
 # Check if images exist
 if (len(files) == 0):
@@ -232,7 +247,6 @@ with alive_bar(len(files)) as compute:
         
 files = glob.glob("*.png")
 files.extend(glob.glob("*.jpg"))
-orgFiles = files.copy()
 
 print("Resizing and converting images...")
 with alive_bar(int((len(files)))) as compute:
@@ -284,165 +298,149 @@ with open("classes.txt", 'w') as f:
 print("Valid images to process: " + str(len(files)))
 
 files = glob.glob("*.jpg")
-randomfiles = random.choices(files, k=round(len(files)*.02)); # only 2% of images
 count = len(files)
+randomfiles = random.choices(files, k=round(len(files)*mixupPercent)); # only 0.2% of images
 
-print("Mixing up...")
-with alive_bar(int((len(randomfiles)))) as compute:
-    for file1 in randomfiles:
-        (name1, ext1) = file1.split('.')
+if mixups:
+    print("Mixing up...")
+    with alive_bar(int((len(randomfiles)))) as compute:
+        for file1 in randomfiles:
+            (name1, ext1) = file1.split('.')
 
-        for file2 in randomfiles:
-            (name2, ext2) = file2.split('.')
+            for file2 in randomfiles:
+                (name2, ext2) = file2.split('.')
 
-            if file1 == file2:
-                continue
+                if file1 == file2:
+                    continue
 
-            try:
-                img1 = cv2.imread(file1)
-                img2 = cv2.imread(file2)
+                try:
+                    img1 = cv2.imread(file1)
+                    img2 = cv2.imread(file2)
 
-                mixup = cv2.addWeighted(img1, 0.5, img2, 0.5, 0)
+                    mixup = cv2.addWeighted(img1, 0.5, img2, 0.5, 0)
 
-                count += 1
-                filesToIgnore.append(count)
-                cv2.imwrite(str(count) + '.' + ext1, mixup)
+                    count += 1
+                    cv2.imwrite(str(count) + '.' + ext1, mixup)
 
-                fileLines = []
+                    fileLines = []
 
-                with open(name1 + '.txt') as file:
-                    for line in file:
-                        fileLines.append(line)
-                
-                with open(name2 + '.txt') as file:
-                    for line in file:
-                        fileLines.append(line)
+                    with open(name1 + '.txt') as file:
+                        for line in file:
+                            fileLines.append(line)
+                    
+                    with open(name2 + '.txt') as file:
+                        for line in file:
+                            fileLines.append(line)
 
-                with open(str(count) + '.txt', 'w') as f:
-                    for line in fileLines:
-                        f.write(line)
-            except:
-                print("Failed to mixup: " + file)
+                    with open(str(count) + '.txt', 'w') as f:
+                        for line in fileLines:
+                            f.write(line)
+                except:
+                    print("Failed to mixup: " + file)
 
-        compute()
-
-files = glob.glob("*.jpg")
-randomfiles = random.choices(files, k=round(len(files)*.10)); # only 10% of images
-count = len(files)
-
-print("Augmenting...")
-with alive_bar(len(randomfiles)) as compute:
-    for file in randomfiles:
-        (name, ext) = getNameAndExt(file)
-
-        if int(name) in filesToIgnore:
             compute()
-            continue
 
-        newLines = []
-        img = cv2.imread(file)
+randomfiles = random.choices(files, k=round(len(files)*augmentPercent)); # only 20% of images
 
-        # Flipped
-        flipped = flip(img, 1)
-        count += 1
-        cv2.imwrite(str(count) + '.' + ext, flipped)
+if augment:
+    print("Augmenting...")
+    with alive_bar(len(randomfiles)) as compute:
+        for file in randomfiles:
+            (name, ext) = getNameAndExt(file)
 
-        if os.path.isfile(name + '.txt'):
-            shutil.copy(name + '.txt', str(count) + '.txt')
-
-            with open(name + '.txt') as file:
-                for line in file:
-                    try:
-                        (id, x, y, w, h) = line.strip().split(' ')
-                        (uid, ux, uw, uy, uh) = unconvert(id, img.shape[0], img.shape[1], float(x), float(y), float(w), float(h))
-
-                        oldUX = ux
-                        ux = img.shape[0] - uw
-                        uw = img.shape[0] - oldUX
-
-                        (cx, cy, cw, ch) = convert((img.shape[0], img.shape[1]), (ux, uw, uy, uh))
-
-                        newLines.append(id + " " + str(cx) + " " + str(cy) + " " + str(cw) + " " + str(ch) + "\n")
-                    except:
-                        newLines.append(line) 
-                        continue;
-            
-            with open(str(count) + '.txt', 'w') as f:
-                for line in newLines:
-                    f.write(line)
-
-        # Brightness UP
-        brigher = increase_brightness(img, 30)
-        count += 1
-        cv2.imwrite(str(count) + '.' + ext, brigher)
-        
-        if os.path.isfile(name + '.txt'):
-            shutil.copy(name + '.txt', str(count) + '.txt')
-
-        # Darkness UP
-        darker = adjust_gamma(img, 0.5)
-        count += 1
-        cv2.imwrite(str(count) + '.' + ext, darker)
-
-        if os.path.isfile(name + '.txt'):
-            shutil.copy(name + '.txt', str(count) + '.txt')
-
-        compute()
-
-files = glob.glob("*.jpg")
-randomfiles = random.choices(files, k=round(len(files)*.02)); # only 2% of images
-count = len(files)
-
-print("Generating noise")
-with alive_bar(len(randomfiles)) as compute:
-    for file in randomfiles:
-        (name, ext) = getNameAndExt(file)
-
-        if int(name) in filesToIgnore:
-            compute()
-            continue
-
-        img = cv2.imread(file)
-        
-        try:
-            prosessed = sp_noise(img, 0.05)
-            count += 1
-            filesToIgnore.append(count)
-            cv2.imwrite(str(count) + '.' + ext, prosessed)
-
-            if os.path.isfile(name + '.txt'):
-                shutil.copy(name + '.txt', str(count) + '.txt')
-        except:
-            print("Failed to add noise to " + file)
-
-        compute()
-
-files = glob.glob("*.jpg")
-randomfiles = random.choices(files, k=round(len(files)*.02)); # only 2% of images
-count = len(files)
-
-print("Generating cutouts")
-with alive_bar(len(randomfiles)) as compute:
-    for file in randomfiles:
-        (name, ext) = getNameAndExt(file)
-
-        if int(name) in filesToIgnore:
-            compute()
-            continue
-        
-        try:
+            newLines = []
             img = cv2.imread(file)
 
-            prosessed = cutout(img, random.randint(6, 18), 50)
+            # Flipped
+            flipped = flip(img, 1)
             count += 1
-            filesToIgnore.append(count)
-            cv2.imwrite(str(count) + '.' + ext, prosessed)
+            cv2.imwrite(str(count) + '.' + ext, flipped)
 
             if os.path.isfile(name + '.txt'):
                 shutil.copy(name + '.txt', str(count) + '.txt')
-        except:
-            print("Failed to add cutouts to " + file)
 
-        compute()
+                with open(name + '.txt') as file:
+                    for line in file:
+                        try:
+                            (id, x, y, w, h) = line.strip().split(' ')
+                            (uid, ux, uw, uy, uh) = unconvert(id, img.shape[0], img.shape[1], float(x), float(y), float(w), float(h))
 
-splitFiles("../output", orgFiles)
+                            oldUX = ux
+                            ux = img.shape[0] - uw
+                            uw = img.shape[0] - oldUX
+
+                            (cx, cy, cw, ch) = convert((img.shape[0], img.shape[1]), (ux, uw, uy, uh))
+
+                            newLines.append(id + " " + str(cx) + " " + str(cy) + " " + str(cw) + " " + str(ch) + "\n")
+                        except:
+                            newLines.append(line) 
+                            continue;
+                
+                with open(str(count) + '.txt', 'w') as f:
+                    for line in newLines:
+                        f.write(line)
+
+            # Brightness UP
+            brigher = increase_brightness(img, 30)
+            count += 1
+            cv2.imwrite(str(count) + '.' + ext, brigher)
+            
+            if os.path.isfile(name + '.txt'):
+                shutil.copy(name + '.txt', str(count) + '.txt')
+
+            # Darkness UP
+            darker = adjust_gamma(img, 0.5)
+            count += 1
+            cv2.imwrite(str(count) + '.' + ext, darker)
+
+            if os.path.isfile(name + '.txt'):
+                shutil.copy(name + '.txt', str(count) + '.txt')
+
+            compute()
+
+randomfiles = random.choices(files, k=round(len(files)*noisePercent)); # only 5% of images
+
+if noise:
+    print("Generating noise")
+    with alive_bar(len(randomfiles)) as compute:
+        for file in randomfiles:
+            (name, ext) = getNameAndExt(file)
+
+            img = cv2.imread(file)
+            
+            try:
+                prosessed = sp_noise(img, 0.05)
+                count += 1
+                cv2.imwrite(str(count) + '.' + ext, prosessed)
+
+                if os.path.isfile(name + '.txt'):
+                    shutil.copy(name + '.txt', str(count) + '.txt')
+            except:
+                print("Failed to add noise to " + file)
+
+            compute()
+
+randomfiles = random.choices(files, k=round(len(files)*cutoutPercent)); # only 5% of images
+
+if cutout:
+    print("Generating little cutouts")
+    with alive_bar(len(randomfiles)) as compute:
+        for file in randomfiles:
+            (name, ext) = getNameAndExt(file)
+            
+            try:
+                img = cv2.imread(file)
+
+                prosessed = cutout(img, random.randint(8, 20), 16)
+                count += 1
+                cv2.imwrite(str(count) + '.' + ext, prosessed)
+
+                if os.path.isfile(name + '.txt'):
+                    shutil.copy(name + '.txt', str(count) + '.txt')
+            except:
+                print("Failed to add cutouts to " + file)
+
+            compute()
+
+if generateSplitOutput:
+    splitFiles("../output", files)

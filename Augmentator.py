@@ -10,10 +10,10 @@ from alive_progress import alive_bar
 
 # --- START OF ADJUSTABLE VARIABLES
 
-mixupPercent = .002 
-augmentPercent = .20
-noisePercent = .05
-cutoutPercent = .05
+mixupPercent = .01
+augmentPercent = 1
+noisePercent = .20
+cutoutPercent = .20
 
 mixups = True
 augment = True
@@ -352,9 +352,10 @@ if augment:
 
             newLines = []
             img = cv2.imread(file)
+            flipped = img
 
             # Flipped
-            flipped = flip(img, 1)
+            flipped = flip(flipped, 1)
             count += 1
             cv2.imwrite(str(count) + '.' + ext, flipped)
 
@@ -391,9 +392,40 @@ if augment:
                 shutil.copy(name + '.txt', str(count) + '.txt')
 
             # Darkness UP
-            darker = adjust_gamma(img, 0.5)
+            darker = adjust_gamma(img, 0.7)
             count += 1
             cv2.imwrite(str(count) + '.' + ext, darker)
+
+            if os.path.isfile(name + '.txt'):
+                shutil.copy(name + '.txt', str(count) + '.txt')
+
+            # Contrast
+            alpha = 1.7
+            beta = 30
+            contrasted = cv2.convertScaleAbs(img, alpha=alpha, beta=beta)
+            contrasted = adjust_gamma(contrasted, 0.7)
+            count += 1
+            cv2.imwrite(str(count) + '.' + ext, contrasted)
+
+            if os.path.isfile(name + '.txt'):
+                shutil.copy(name + '.txt', str(count) + '.txt')
+
+            # Saturate
+            saturate = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+            saturate[...,1] = saturate[...,1]*1.5
+            saturate = cv2.cvtColor(saturate, cv2.COLOR_HSV2BGR)
+            count += 1
+            cv2.imwrite(str(count) + '.' + ext, saturate)
+
+            if os.path.isfile(name + '.txt'):
+                shutil.copy(name + '.txt', str(count) + '.txt')
+
+            # Desaturate
+            saturate = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+            saturate[...,1] = saturate[...,1]*0.7
+            saturate = cv2.cvtColor(saturate, cv2.COLOR_HSV2BGR)
+            count += 1
+            cv2.imwrite(str(count) + '.' + ext, saturate)
 
             if os.path.isfile(name + '.txt'):
                 shutil.copy(name + '.txt', str(count) + '.txt')
@@ -411,7 +443,7 @@ if noise:
             img = cv2.imread(file)
             
             try:
-                prosessed = sp_noise(img, 0.05)
+                prosessed = sp_noise(img, 0.03)
                 count += 1
                 cv2.imwrite(str(count) + '.' + ext, prosessed)
 
@@ -433,7 +465,7 @@ if cutout:
             try:
                 img = cv2.imread(file)
 
-                prosessed = cutout(img, random.randint(8, 20), 16)
+                prosessed = cutout(img, random.randint(12, 30), 16)
                 count += 1
                 cv2.imwrite(str(count) + '.' + ext, prosessed)
 
